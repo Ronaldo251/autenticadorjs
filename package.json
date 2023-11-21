@@ -44,6 +44,7 @@
     "mime": "^1.6.0",
     "mime-db": "^1.52.0",
     "mime-types": "^2.1.35",
+    "mongoose": "^8.0.1",
     "ms": "^2.0.0",
     "negotiator": "^0.6.3",
     "object-inspect": "^1.13.1",
@@ -69,8 +70,7 @@
     "vary": "^1.1.2"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server.js"
+    "test": "mocha"
   },
   "repository": {
     "type": "git",
@@ -82,5 +82,10 @@
     "url": "https://github.com/Ronaldo251/autenticadorjs/issues"
   },
   "homepage": "https://github.com/Ronaldo251/autenticadorjs#readme",
-  "keywords": []
+  "keywords": [],
+  "devDependencies": {
+    "chai": "^4.3.10",
+    "chai-http": "^4.4.0",
+    "mocha": "^10.2.0"
+  }
 }
