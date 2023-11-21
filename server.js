@@ -2,14 +2,29 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const mongoose = require('mongoose');
 
 const app = express();
 const PORT = 3000;
 
 app.use(bodyParser.json());
 
-// Simulação de armazenamento persistente
-const users = [];
+// Conectando ao MongoDB (substitua 'mongodb://localhost:27017/seu_banco_de_dados' pelo seu próprio URI do MongoDB)
+mongoose.connect('mongodb://localhost:27017/seu_banco_de_dados', { useNewUrlParser: true, useUnifiedTopology: true });
+
+// Definindo um modelo Mongoose para o usuário
+const userSchema = new mongoose.Schema({
+  nome: String,
+  email: String,
+  senha: String,
+  telefones: [{ numero: String, ddd: String }],
+  data_criacao: String,
+  data_atualizacao: String,
+  ultimo_login: String,
+  token: String,
+});
+
+const User = mongoose.model('User', userSchema);
 
 // Middleware para autenticação com JWT
 const authenticateToken = (req, res, next) => {
@@ -25,53 +40,67 @@ const authenticateToken = (req, res, next) => {
 };
 
 // Endpoint para criar um novo usuário (Sign Up)
-app.post('/signup', (req, res) => {
+app.post('/signup', async (req, res) => {
   const { nome, email, senha, telefones } = req.body;
 
   if (!nome || !email || !senha || !telefones) {
     return res.status(400).json({ mensagem: 'Todos os campos são obrigatórios.' });
   }
 
-  if (users.find(user => user.email === email)) {
-    return res.status(409).json({ mensagem: 'E-mail já existente.' });
+  try {
+    const existingUser = await User.findOne({ email });
+
+    if (existingUser) {
+      return res.status(409).json({ mensagem: 'E-mail já existente.' });
+    }
+
+    const id = generateId();
+    const dataCriacao = new Date().toISOString();
+    const dataAtualizacao = dataCriacao;
+    const ultimoLogin = dataCriacao;
+
+    const newUser = new User({
+      id,
+      nome,
+      email,
+      senha: bcrypt.hashSync(senha, 10),
+      telefones,
+      data_criacao: dataCriacao,
+      data_atualizacao: dataAtualizacao,
+      ultimo_login: ultimoLogin,
+      token: generateToken({ id, email }),
+    });
+
+    await newUser.save();
+
+    return res.status(201).json(newUser.toObject());
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ mensagem: 'Erro interno do servidor.' });
   }
-
-  const id = generateId();
-  const dataCriacao = new Date().toISOString();
-  const dataAtualizacao = dataCriacao;
-  const ultimoLogin = dataCriacao;
-
-  const newUser = {
-    id,
-    nome,
-    email,
-    senha: bcrypt.hashSync(senha, 10),
-    telefones,
-    data_criacao: dataCriacao,
-    data_atualizacao: dataAtualizacao,
-    ultimo_login: ultimoLogin,
-    token: generateToken({ id, email }),
-  };
-
-  users.push(newUser);
-
-  return res.status(201).json(newUser);
 });
 
 // Endpoint para autenticar o usuário (Sign In)
-app.post('/signin', (req, res) => {
+app.post('/signin', async (req, res) => {
   const { email, senha } = req.body;
 
-  const user = users.find(user => user.email === email);
+  try {
+    const user = await User.findOne({ email });
 
-  if (!user || !bcrypt.compareSync(senha, user.senha)) {
-    return res.status(401).json({ mensagem: 'Usuário e/ou senha inválidos.' });
+    if (!user || !bcrypt.compareSync(senha, user.senha)) {
+      return res.status(401).json({ mensagem: 'Usuário e/ou senha inválidos.' });
+    }
+
+    user.ultimo_login = new Date().toISOString();
+    user.token = generateToken({ id: user.id, email: user.email });
+
+    await user.save();
+
+    return res.json(user.toObject());
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ mensagem: 'Erro interno do servidor.' });
   }
-
-  user.ultimo_login = new Date().toISOString();
-  user.token = generateToken({ id: user.id, email: user.email });
-
-  return res.json(user);
 });
 
 // Endpoint para buscar informações do usuário
@@ -98,5 +127,3 @@ function generateToken(payload) {
 app.listen(PORT, () => {
   console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
-
-
